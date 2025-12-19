@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Quiet Nexus</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400&display=swap" rel="stylesheet">
+
+<style>
+html, body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background: black;
+    font-family: 'Inter', system-ui, sans-serif;
+}
+
+canvas {
+    display: block;
+}
+
+/* Floating phrase */
+#phrase {
+    position: fixed;
+    bottom: 90px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 13px;
+    letter-spacing: 0.06em;
+    color: rgba(200, 160, 255, 0.7);
+    opacity: 0;
+    pointer-events: none;
+    user-select: none;
+    text-align: center;
+    transition: opacity 3s;
+}
+</style>
+</head>
+
+<body>
+<canvas id="c"></canvas>
+<div id="phrase"></div>
+
+<script>
+/* ======================
+   CANVAS SETUP
+====================== */
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d");
+
+let w = window.innerWidth;
+let h = window.innerHeight;
+canvas.width = w;
+canvas.height = h;
+
+/* ======================
+   CONFIG
+====================== */
+const BASE_PARTICLES = 160;
+const MAX_DIST = 230;
+const FPS = 30;
+
+let hue = 265;
+let lastTime = 0;
+let breath = 0;
+let speedBoost = 1;
+
+/* ======================
+   PARTICLES
+====================== */
+const particles = [];
+
+function createParticle(x = Math.random() * w, y = Math.random() * h) {
+    return {
+        x,
+        y,
+        vx: (Math.random() - 0.5) * 0.25,
+        vy: (Math.random() - 0.5) * 0.25,
+        r: Math.random() * 1.8 + 1
+    };
+}
+
+for (let i = 0; i < BASE_PARTICLES; i++) {
+    particles.push(createParticle());
+}
+
+/* ======================
+   RESIZE HANDLING
+====================== */
+window.addEventListener("resize", () => {
+    const oldW = w;
+    const oldH = h;
+
+    w = window.innerWidth;
+    h = window.innerHeight;
+    canvas.width = w;
+    canvas.height = h;
+
+    const ratioX = w / oldW;
+    const ratioY = h / oldH;
+
+    for (const p of particles) {
+        p.x *= ratioX;
+        p.y *= ratioY;
+    }
+
+    if (ratioX > 1 || ratioY > 1) {
+        speedBoost = 2.8;
+    }
+});
+
+/* ======================
+   PHRASES (ALL LANGUAGES MIXED)
+====================== */
+const phrases = [
+    // English
+    "Everything is connected",
+    "Nothing is in a hurry",
+    "Silence has depth",
+    "The night is breathing",
+    "Time moves softly",
+    "Calm is never empty",
+    "Light finds its way",
+    "Motion without urgency",
+    "Stillness has weight",
+
+    // Japanese
+    "すべてはつながっている",
+    "静けさは空ではない",
+    "夜は呼吸している",
+    "時は静かに流れる",
+    "何も急ぐ必要はない",
+    "光は道を見つける",
+    "動きは穏やかに",
+    "この瞬間で十分だ",
+
+    // Latin
+    "Omnia conectuntur",
+    "Silentium profundum est",
+    "Tempus leniter fluit",
+    "Nihil festinat",
+    "Lux viam invenit",
+    "Motus sine urgentiā",
+    "Aequilibrium emergit",
+    "Hoc momentum sufficit"
+];
+
+const phraseEl = document.getElementById("phrase");
+let lastPhrase = "";
+
+/* Pick a random phrase different from the previous one */
+function showPhrase() {
+    phraseEl.style.opacity = 0;
+
+    setTimeout(() => {
+        let next;
+        do {
+            next = phrases[Math.floor(Math.random() * phrases.length)];
+        } while (next === lastPhrase);
+
+        lastPhrase = next;
+        phraseEl.textContent = next;
+        phraseEl.style.opacity = 1;
+    }, 3000);
+}
+
+showPhrase();
+setInterval(showPhrase, 10000);
+
+/* ======================
+   RENDER LOOP
+====================== */
+function loop(time) {
+    if (time - lastTime < 1000 / FPS) {
+        requestAnimationFrame(loop);
+        return;
+    }
+    lastTime = time;
+
+    breath += 0.003;
+    const glow = 0.8 + Math.sin(breath) * 0.2;
+
+    ctx.fillStyle = "rgba(0,0,0,0.2)";
+    ctx.fillRect(0, 0, w, h);
+
+    hue = (hue + 0.02) % 360;
+    speedBoost += (1 - speedBoost) * 0.04;
+
+    for (let i = 0; i < particles.length; i++) {
+        const p = particles[i];
+
+        p.x += p.vx * speedBoost;
+        p.y += p.vy * speedBoost;
+
+        if (p.x < 0) p.x = w;
+        if (p.x > w) p.x = 0;
+        if (p.y < 0) p.y = h;
+        if (p.y > h) p.y = 0;
+
+        ctx.fillStyle = `hsla(${hue},70%,60%,${glow})`;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fill();
+
+        for (let j = i + 1; j < particles.length; j++) {
+            const q = particles[j];
+            const dx = p.x - q.x;
+            const dy = p.y - q.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            if (dist < MAX_DIST) {
+                ctx.strokeStyle = `hsla(${hue},70%,65%,${(1 - dist / MAX_DIST) * 0.35})`;
+                ctx.lineWidth = 0.4;
+                ctx.beginPath();
+                ctx.moveTo(p.x, p.y);
+                ctx.lineTo(q.x, q.y);
+                ctx.stroke();
+            }
+        }
+    }
+
+    requestAnimationFrame(loop);
+}
+
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
