@@ -1,3 +1,3 @@
 # Quiet-Nexus
 
-Quiet Nexus is a stylish wallpaper featuring dots, lines, and phrases.
+Quiet Nexus is an elegant wallpaper composed of dots, lines, and phrases in English, Latin, and Japanese.
