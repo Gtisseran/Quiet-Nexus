@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Quiet Nexus</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400&display=swap" rel="stylesheet">
+
+<style>
+html, body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background: black;
+    font-family: 'Inter', system-ui, sans-serif;
+}
+
+canvas {
+    display: block;
+}
+
+/* Floating text */
+#phrase {
+    position: fixed;
+    bottom: 90px; /* lifted above the Windows taskbar */
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 13px;
+    letter-spacing: 0.05em;
+    color: rgba(200, 160, 255, 0.7);
+    opacity: 0;
+    pointer-events: none;
+    user-select: none;
+    text-align: center;
+    transition: opacity 3s;
+}
+</style>
+</head>
+
+<body>
+<canvas id="c"></canvas>
+<div id="phrase"></div>
+
+<script>
+/* ======================
+   CANVAS SETUP
+====================== */
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d");
+
+let w = window.innerWidth;
+let h = window.innerHeight;
+canvas.width = w;
+canvas.height = h;
+
+/* ======================
+   GLOBAL CONFIGURATION
+====================== */
+const BASE_PARTICLES = 160;
+const MAX_DIST = 230;
+const FPS = 30;
+
+let hue = 265;
+let lastTime = 0;
+let breath = 0;
+
+/* Temporary speed multiplier used after resize */
+let speedBoost = 1;
+
+/* ======================
+   MOUSE PARALLAX (VERY SUBTLE)
+====================== */
+let mouseX = 0;
+let mouseY = 0;
+
+window.addEventListener("mousemove", e => {
+    mouseX = (e.clientX / w - 0.5) * 3;
+    mouseY = (e.clientY / h - 0.5) * 3;
+});
+
+/* ======================
+   PARTICLE SYSTEM
+====================== */
+const particles = [];
+
+function createParticle(x = Math.random() * w, y = Math.random() * h) {
+    return {
+        x,
+        y,
+        vx: (Math.random() - 0.5) * 0.25,
+        vy: (Math.random() - 0.5) * 0.25,
+        r: Math.random() * 1.8 + 1
+    };
+}
+
+/* Initial particle population */
+for (let i = 0; i < BASE_PARTICLES; i++) {
+    particles.push(createParticle());
+}
+
+/* ======================
+   RESIZE HANDLING (STABLE)
+====================== */
+window.addEventListener("resize", () => {
+    const oldW = w;
+    const oldH = h;
+
+    w = window.innerWidth;
+    h = window.innerHeight;
+    canvas.width = w;
+    canvas.height = h;
+
+    const ratioX = w / oldW;
+    const ratioY = h / oldH;
+
+    /* Re-map particle positions to avoid empty areas */
+    for (const p of particles) {
+        p.x *= ratioX;
+        p.y *= ratioY;
+    }
+
+    /* Temporary acceleration when the window grows */
+    if (ratioX > 1 || ratioY > 1) {
+        speedBoost = 2.8;
+    }
+});
+
+/* ======================
+   PHRASES (RANDOM ORDER)
+====================== */
+const phrases = [
+    "Everything is connected",
+    "Nothing is in a hurry",
+    "Silence has depth",
+    "The night is breathing",
+    "Time moves softly",
+    "Stay a little longer",
+    "The space listens",
+    "Calm is never empty",
+    "Light finds its way",
+    "Everything settles",
+    "Motion without urgency",
+    "Balance emerges",
+    "The moment is enough",
+    "Nothing needs attention",
+    "Forms drift quietly",
+    "Stillness has weight"
+];
+
+let phraseIndex = 0;
+let shuffled = [];
+const phraseEl = document.getElementById("phrase");
+
+/* Shuffle phrases to avoid repetition patterns */
+function shufflePhrases() {
+    shuffled = [...phrases].sort(() => Math.random() - 0.5);
+    phraseIndex = 0;
+}
+
+/* Display the next phrase with a soft fade */
+function showPhrase() {
+    if (phraseIndex >= shuffled.length) shufflePhrases();
+
+    phraseEl.style.opacity = 0;
+    setTimeout(() => {
+        phraseEl.textContent = shuffled[phraseIndex++];
+        phraseEl.style.opacity = 1;
+    }, 3000);
+}
+
+shufflePhrases();
+showPhrase();
+setInterval(showPhrase, 18000);
+
+/* ======================
+   MAIN RENDER LOOP
+====================== */
+function loop(time) {
+    if (time - lastTime < 1000 / FPS) {
+        requestAnimationFrame(loop);
+        return;
+    }
+    lastTime = time;
+
+    /* Subtle breathing effect */
+    breath += 0.003;
+    const glow = 0.8 + Math.sin(breath) * 0.2;
+
+    ctx.fillStyle = "rgba(0,0,0,0.2)";
+    ctx.fillRect(0, 0, w, h);
+
+    hue = (hue + 0.02) % 360;
+
+    /* Smoothly return speed to normal */
+    speedBoost += (1 - speedBoost) * 0.04;
+
+    for (let i = 0; i < particles.length; i++) {
+        const p = particles[i];
+
+        p.x += p.vx * speedBoost;
+        p.y += p.vy * speedBoost;
+
+        /* Screen wrapping */
+        if (p.x < 0) p.x = w;
+        if (p.x > w) p.x = 0;
+        if (p.y < 0) p.y = h;
+        if (p.y > h) p.y = 0;
+
+        const px = p.x + mouseX;
+        const py = p.y + mouseY;
+
+        ctx.fillStyle = `hsla(${hue},70%,60%,${glow})`;
+        ctx.beginPath();
+        ctx.arc(px, py, p.r, 0, Math.PI * 2);
+        ctx.fill();
+
+        /* Connection lines */
+        for (let j = i + 1; j < particles.length; j++) {
+            const q = particles[j];
+            const dx = px - (q.x + mouseX);
+            const dy = py - (q.y + mouseY);
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            if (dist < MAX_DIST) {
+                ctx.strokeStyle = `hsla(${hue},70%,65%,${(1 - dist / MAX_DIST) * 0.35})`;
+                ctx.lineWidth = 0.4;
+                ctx.beginPath();
+                ctx.moveTo(px, py);
+                ctx.lineTo(q.x + mouseX, q.y + mouseY);
+                ctx.stroke();
+            }
+        }
+    }
+
+    requestAnimationFrame(loop);
+}
+
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
